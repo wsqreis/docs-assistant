@@ -1,0 +1,23 @@
+[[web.server]]
+= Embedded Web Servers
+
+Applications start an embedded web server by default.
+
+[[web.server.port]]
+== Changing the Port
+
+Set configprop:server.port[] to choose the HTTP port, for example `server.port=9090`.
+See xref:reference:web/server.adoc#web.server.shutdown[graceful shutdown] for stopping the server.
+
+include-code::PortConfiguration[]
+
+[[web.server.shutdown]]
+== Graceful Shutdown
+
+When the application stops, javadoc:org.example.web.WebServer[] lets requests in progress finish.
+Annotate a bean with javadoc:org.example.Lifecycle[format=annotation] to take part.
+
+[[web.server.shutdown.timeout]]
+=== Timeout
+
+The grace period is configured with configprop:server.shutdown.timeout[].

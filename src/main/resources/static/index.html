@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Spring Boot Docs Assistant</title>
+  <style>
+    :root { --bg:#f6f8f6; --panel:#fff; --text:#1a1f1c; --muted:#5f6b63; --border:#dfe5e1; --accent:#2f8f46; --code:#eef2ef; }
+    @media (prefers-color-scheme: dark) {
+      :root { --bg:#111513; --panel:#191e1b; --text:#e6ece8; --muted:#9aa7a0; --border:#2b332e; --accent:#6dd58c; --code:#212824; }
+    }
+    * { box-sizing: border-box; }
+    body { margin:0; font:15px/1.6 system-ui, sans-serif; background:var(--bg); color:var(--text); }
+    main { max-width: 1100px; margin: 0 auto; padding: 16px; }
+    h1 { font-size: 20px; margin: 8px 0 2px; }
+    .sub { color: var(--muted); font-size: 13px; margin: 0 0 14px; }
+    nav button { background:none; border:0; border-bottom:2px solid transparent; padding:6px 2px; margin-right:16px; font:inherit; color:var(--muted); cursor:pointer; }
+    nav button.on { color:var(--text); border-color:var(--accent); }
+    form { display:flex; gap:8px; margin:14px 0; }
+    input { flex:1; padding:10px 12px; border:1px solid var(--border); border-radius:8px; background:var(--panel); color:var(--text); font:inherit; }
+    form button { padding:10px 16px; border:0; border-radius:8px; background:var(--accent); color:#fff; font:inherit; cursor:pointer; }
+    .chips button { background:none; border:1px solid var(--border); color:var(--accent); border-radius:99px; padding:3px 10px; font-size:13px; margin:0 6px 6px 0; cursor:pointer; }
+    section { background:var(--panel); border:1px solid var(--border); border-radius:10px; padding:16px; }
+    .answer p { margin: 0 0 10px; }
+    .answer pre, .answer code { background:var(--code); border-radius:6px; font-size:13px; }
+    .answer pre { padding:10px; overflow-x:auto; } .answer code { padding:1px 4px; }
+    .cite { font-size:12px; vertical-align:super; text-decoration:none; color:var(--accent); }
+    .sources { margin-top:14px; padding-top:10px; border-top:1px solid var(--border); font-size:13px; }
+    .sources a { color:var(--accent); } .sources li { margin-bottom:4px; }
+    .meta { color:var(--muted); font-size:12px; }
+    .notice { color:var(--muted); }
+    .grid { display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); gap:12px; }
+    @media (max-width: 860px) { .grid { grid-template-columns:1fr; } }
+    .grid h3 { font-size:14px; margin:0 0 8px; }
+    .hit { padding:8px 0; border-top:1px solid var(--border); font-size:13px; }
+    .hit a { color:var(--accent); font-weight:600; text-decoration:none; }
+    [hidden] { display:none !important; }
+  </style>
+</head>
+<body>
+<main>
+  <h1>Spring Boot Docs Assistant</h1>
+  <p class="sub">Answers from the Spring Boot 4.1 reference documentation, with citations. Also available to coding agents as an MCP server at <code>/mcp</code>.</p>
+  <nav><button id="tab-ask" class="on">Ask</button><button id="tab-compare">Compare retrieval</button></nav>
+
+  <div id="ask">
+    <form id="ask-form"><input id="q" placeholder="e.g. How do I run Flyway migrations on startup?" maxlength="500" required><button>Ask</button></form>
+    <div class="chips" id="examples"></div>
+    <section id="out" hidden><div class="answer" id="answer"></div><div class="sources" id="sources"></div></section>
+  </div>
+
+  <div id="compare" hidden>
+    <form id="compare-form"><input id="cq" placeholder="A query to run through vector, keyword and hybrid search" maxlength="500" required><button>Search</button></form>
+    <div class="grid" id="grid"></div>
+  </div>
+</main>
+<script>
+  const $ = (id) => document.getElementById(id);
+  const el = (tag, props = {}, children = []) => { const n = Object.assign(document.createElement(tag), props); n.append(...children); return n; };
+
+  for (const [tab, panel] of [['tab-ask', 'ask'], ['tab-compare', 'compare']]) {
+    $(tab).onclick = () => {
+      document.querySelectorAll('nav button').forEach((b) => b.classList.toggle('on', b.id === tab));
+      $('ask').hidden = panel !== 'ask'; $('compare').hidden = panel !== 'compare';
+    };
+  }
+
+  for (const text of ['How do I change the HTTP port?', 'Expose the Prometheus endpoint', 'Test a controller with @WebMvcTest', 'Let in-flight requests finish on shutdown']) {
+    $('examples').append(el('button', { type: 'button', textContent: text, onclick: () => { $('q').value = text; $('ask-form').requestSubmit(); } }));
+  }
+
+  // Minimal, safe Markdown: escape everything, then add code, bold and citation links.
+  function render(markdown, sources) {
+    const escape = (s) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+    let html = escape(markdown)
+      .replace(/```[\w-]*\n([\s\S]*?)```/g, (_, code) => `<pre><code>${code}</code></pre>`)
+      .replace(/`([^`\n]+)`/g, '<code>$1</code>')
+      .replace(/\*\*([^*\n]+)\*\*/g, '<strong>$1</strong>')
+      .replace(/\[(\d+)\]/g, (m, n) => {
+        const s = sources[Number(n) - 1];
+        return s ? `<a class="cite" href="${escape(s.url)}" target="_blank" rel="noopener">[${n}]</a>` : m;
+      });
+    return html.split(/\n{2,}/).map((p) => p.startsWith('<pre>') ? p : `<p>${p.replace(/\n/g, '<br>')}</p>`).join('');
+  }
+
+  let stream;
+  $('ask-form').addEventListener('submit', (event) => {
+    event.preventDefault();
+    stream?.close();
+    let text = '', sources = [];
+    $('out').hidden = false;
+    $('answer').innerHTML = '<p class="notice">Searching the docs…</p>';
+    $('sources').replaceChildren();
+    stream = new EventSource(`/api/ask?q=${encodeURIComponent($('q').value)}`);
+    stream.addEventListener('sources', (e) => {
+      sources = JSON.parse(e.data);
+      $('sources').replaceChildren(el('div', { className: 'meta', textContent: 'Sources' }),
+        el('ol', {}, sources.map((s) => el('li', {}, [el('a', { href: s.url, target: '_blank', rel: 'noopener', textContent: s.breadcrumb })]))));
+    });
+    stream.addEventListener('token', (e) => { text += JSON.parse(e.data).text; $('answer').innerHTML = render(text, sources); });
+    stream.addEventListener('done', (e) => {
+      stream.close();
+      if (JSON.parse(e.data).cached) $('sources').prepend(el('div', { className: 'meta', textContent: 'Served from the semantic cache.' }));
+    });
+    stream.addEventListener('declined', (e) => { stream.close(); $('answer').replaceChildren(el('p', { className: 'notice', textContent: JSON.parse(e.data).reason })); });
+    stream.addEventListener('failure', (e) => { stream.close(); $('answer').replaceChildren(el('p', { className: 'notice', textContent: JSON.parse(e.data).message })); });
+    // 'error' is the browser's own event for a dropped connection
+    stream.onerror = () => { if (stream.readyState !== EventSource.CLOSED) { stream.close(); $('answer').append(el('p', { className: 'notice', textContent: 'Connection lost.' })); } };
+  });
+
+  $('compare-form').addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const q = encodeURIComponent($('cq').value);
+    const columns = await Promise.all(['VECTOR', 'KEYWORD', 'HYBRID'].map(async (mode) =>
+      [mode, await (await fetch(`/api/search?q=${q}&mode=${mode}&limit=5`)).json()]));
+    $('grid').replaceChildren(...columns.map(([mode, hits]) => el('section', {}, [
+      el('h3', { textContent: mode.toLowerCase() }),
+      ...(hits.length ? hits.map((h) => el('div', { className: 'hit' }, [
+        el('a', { href: h.url, target: '_blank', rel: 'noopener', textContent: h.title }),
+        el('div', { className: 'meta', textContent: `${h.breadcrumb} · score ${h.score.toFixed(3)}` }),
+      ])) : [el('p', { className: 'notice', textContent: 'No results.' })]),
+    ])));
+  });
+</script>
+</body>
+</html>

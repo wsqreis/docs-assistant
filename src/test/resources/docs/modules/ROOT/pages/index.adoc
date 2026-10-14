@@ -1,0 +1,12 @@
+[[index]]
+= Example Docs
+
+// a comment that must not be indexed
+:page-attribute: ignored
+
+This fixture documents an imaginary framework for tests.
+
+[[index.installing]]
+== Installing
+
+Add the starter to your build and run the application.

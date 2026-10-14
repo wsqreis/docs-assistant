@@ -1,0 +1,43 @@
+spring:
+  application:
+    name: docs-assistant
+  threads:
+    virtual:
+      enabled: true
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5433/docs}
+    username: ${DB_USER:docs}
+    password: ${DB_PASSWORD:docs}
+  ai:
+    # Chat via OpenRouter (OpenAI-compatible); embeddings run locally with ONNX, at no cost.
+    model:
+      embedding: transformers
+      image: none
+      audio:
+        speech: none
+        transcription: none
+      moderation: none
+    openai:
+      base-url: ${LLM_BASE_URL:https://openrouter.ai/api/v1}
+      api-key: ${OPENROUTER_API_KEY:not-configured}
+      chat:
+        options:
+          model: ${LLM_MODEL:nvidia/nemotron-3-super-120b-a12b:free}
+          temperature: 0.1
+    embedding:
+      transformer:
+        cache:
+          directory: ${user.home}/.cache/docs-assistant/onnx
+    mcp:
+      server:
+        # Streamable HTTP at /mcp (the current MCP transport); without this the auto-configuration serves SSE at /sse.
+        protocol: STREAMABLE
+        name: spring-boot-docs
+        version: 0.1.0
+        instructions: Search and quote the Spring Boot 4.1 reference documentation.
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
