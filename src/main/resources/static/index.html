@@ -76,7 +76,8 @@
       .replace(/```[\w-]*\n([\s\S]*?)```/g, (_, code) => `<pre><code>${code}</code></pre>`)
       .replace(/`([^`\n]+)`/g, '<code>$1</code>')
       .replace(/\*\*([^*\n]+)\*\*/g, '<strong>$1</strong>')
-      .replace(/\[(\d+)\]/g, (m, n) => {
+      // Some models cite with lenticular brackets (【1】) instead of [1].
+      .replace(/[\[【](\d+)[\]】]/g, (m, n) => {
         const s = sources[Number(n) - 1];
         return s ? `<a class="cite" href="${escape(s.url)}" target="_blank" rel="noopener">[${n}]</a>` : m;
       });
