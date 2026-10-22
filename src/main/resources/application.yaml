@@ -22,7 +22,7 @@ spring:
       api-key: ${OPENROUTER_API_KEY:not-configured}
       chat:
         options:
-          model: ${LLM_MODEL:nvidia/nemotron-3-super-120b-a12b:free}
+          model: ${LLM_MODEL:nvidia/nemotron-3-ultra-550b-a55b:free}
           temperature: 0.1
     embedding:
       transformer:
