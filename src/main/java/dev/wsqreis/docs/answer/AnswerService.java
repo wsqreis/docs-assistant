@@ -12,6 +12,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 
 /**
@@ -79,7 +80,7 @@ public class AnswerService {
             return;
         }
 
-        var results = search.search(question, embedding, mode, sourceCount);
+        var results = bySection(search.search(question, embedding, mode, sourceCount));
         var sources = new ArrayList<Source>();
         for (int i = 0; i < results.size(); i++) {
             var r = results.get(i);
@@ -105,6 +106,19 @@ public class AnswerService {
                             }
                             listener.done(false);
                         });
+    }
+
+    /**
+     * Windows of one long section can rank next to each other. Merging them keeps one numbered excerpt and one
+     * source per section, instead of the same link listed three times.
+     */
+    static List<SearchResult> bySection(List<SearchResult> results) {
+        var sections = new LinkedHashMap<String, SearchResult>();
+        for (var r : results) {
+            sections.merge(r.url(), r, (first, next) -> new SearchResult(first.id(), first.page(), first.anchor(),
+                    first.title(), first.breadcrumb(), first.url(), first.content() + "\n\n" + next.content(), first.score()));
+        }
+        return List.copyOf(sections.values());
     }
 
     static String userMessage(String question, List<SearchResult> results) {
