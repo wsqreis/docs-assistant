@@ -69,7 +69,7 @@
     $('examples').append(el('button', { type: 'button', textContent: text, onclick: () => { $('q').value = text; $('ask-form').requestSubmit(); } }));
   }
 
-  // Minimal, safe Markdown: escape everything, then add code, bold and citation links.
+  // Minimal, safe Markdown: escape everything, then add code, bold, headings and citation links.
   function render(markdown, sources) {
     const escape = (s) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
     let html = escape(markdown)
@@ -81,7 +81,9 @@
         const s = sources[Number(n) - 1];
         return s ? `<a class="cite" href="${escape(s.url)}" target="_blank" rel="noopener">[${n}]</a>` : m;
       });
-    return html.split(/\n{2,}/).map((p) => p.startsWith('<pre>') ? p : `<p>${p.replace(/\n/g, '<br>')}</p>`).join('');
+    // Headings become bold lines, outside code blocks only (where "#" starts a comment).
+    const heading = (p) => p.replace(/^#{1,4} (.+)$/gm, '<strong>$1</strong>');
+    return html.split(/\n{2,}/).map((p) => p.startsWith('<pre>') ? p : `<p>${heading(p).replace(/\n/g, '<br>')}</p>`).join('');
   }
 
   let stream;
