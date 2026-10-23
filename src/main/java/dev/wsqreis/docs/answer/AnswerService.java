@@ -46,13 +46,15 @@ public class AnswerService {
     private final double minSimilarity;
     private final double cacheSimilarity;
     private final Duration cacheMaxAge;
+    private final Duration idleTimeout;
 
     public AnswerService(SearchService search, EmbeddingModel embeddings, AnswerCache cache, ChatClient.Builder chat,
                          @Value("${docs.answer.retrieval-mode:VECTOR}") SearchMode mode,
                          @Value("${docs.answer.sources:6}") int sourceCount,
                          @Value("${docs.answer.min-similarity:0.33}") double minSimilarity,
                          @Value("${docs.cache.min-similarity:0.95}") double cacheSimilarity,
-                         @Value("${docs.cache.max-age:7d}") Duration cacheMaxAge) {
+                         @Value("${docs.cache.max-age:7d}") Duration cacheMaxAge,
+                         @Value("${docs.answer.idle-timeout:45s}") Duration idleTimeout) {
         this.search = search;
         this.embeddings = embeddings;
         this.cache = cache;
@@ -62,6 +64,7 @@ public class AnswerService {
         this.minSimilarity = minSimilarity;
         this.cacheSimilarity = cacheSimilarity;
         this.cacheMaxAge = cacheMaxAge;
+        this.idleTimeout = idleTimeout;
     }
 
     public void ask(String question, AnswerListener listener) {
@@ -93,6 +96,8 @@ public class AnswerService {
                 .user(userMessage(question, results))
                 .stream()
                 .content()
+                // A stalled model would otherwise hold the stream open until the SSE connection times out.
+                .timeout(idleTimeout)
                 .doOnNext(answer::append)
                 .subscribe(
                         listener::token,

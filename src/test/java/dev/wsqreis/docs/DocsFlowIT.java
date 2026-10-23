@@ -35,6 +35,7 @@ import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Stream;
@@ -46,7 +47,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = {
         "spring.ai.model.embedding=none",
         "spring.ai.model.chat=none",
-        "docs.answer.min-similarity=0.15"
+        "docs.answer.min-similarity=0.15",
+        "docs.answer.idle-timeout=2s"
 })
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 class DocsFlowIT {
@@ -178,6 +180,18 @@ class DocsFlowIT {
 
     @Test
     @Order(7)
+    void endsTheStreamWhenTheModelStalls() throws Exception {
+        cache.clear();
+        chat.stall();
+        var started = System.nanoTime();
+        var events = ask("What is the graceful shutdown timeout?");
+        assertThat(events.names()).containsExactly("sources", "failure");
+        assertThat(Duration.ofNanos(System.nanoTime() - started)).isLessThan(Duration.ofSeconds(30));
+        chat.reply("ok");
+    }
+
+    @Test
+    @Order(8)
     void reindexingClearsTheAnswerCache(@TempDir Path copy) throws Exception {
         chat.reply("cached answer");
         ask("How do I change the HTTP port of the server?");
@@ -192,7 +206,7 @@ class DocsFlowIT {
     }
 
     @Test
-    @Order(8)
+    @Order(9)
     void mcpToolsSearchAndReadSections() {
         var hits = tools.searchDocs("graceful shutdown requests in progress", 2);
         assertThat(hits).isNotEmpty();
@@ -203,7 +217,7 @@ class DocsFlowIT {
     }
 
     @Test
-    @Order(9)
+    @Order(10)
     void rejectsInvalidRequests() throws Exception {
         var response = HttpClient.newHttpClient().send(
                 HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/search?q=")).build(),
