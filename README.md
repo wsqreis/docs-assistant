@@ -44,7 +44,7 @@ Three modes, all in SQL over the same table:
 1. **Semantic cache:** a question within 0.95 cosine similarity of one already answered gets the stored answer and sources instantly. Re-indexing clears the cache, since cached answers may quote text that changed.
 2. **Off-topic gate:** if no documentation chunk is similar enough to the question, the assistant declines without calling the LLM. The threshold was set by comparing the closest-section similarity of real Spring Boot questions with clearly unrelated ones (recipes, trivia, CSS, prompt-injection attempts).
 3. **Grounded generation:** the model gets the top 6 sections as numbered excerpts. It must cite them as `[n]`, which the UI turns into links, and it must say the docs don't cover the question rather than answer from memory. That second layer handles questions that are near the docs but not in them, such as Hibernate Envers.
-4. **Streaming:** Server-Sent Events carry `sources` first, then `token`s as the model writes, then `done`. The other outcomes are `declined` and `failure`.
+4. **Streaming:** Server-Sent Events carry `sources` first, then `token`s as the model writes, then `done`. The other outcomes are `declined` and `failure`. If the model sends nothing for 45 seconds, the stream ends with `failure`.
 
 ## Evaluation
 
